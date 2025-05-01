@@ -1,0 +1,7 @@
+[events]
+"birthday label" = { date = 1987-03-03, type = "birthday" }
+"second birthday label" = { date = 2020-05-26, type = "birthday" }
+"generic event" = { date = 2010-03-20 }
+
+[phases]
+"phase" = { from_date = 2010-04-01, to_date = 2022-04-14, layer = "job" }
