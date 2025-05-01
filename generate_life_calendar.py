@@ -8,7 +8,7 @@ from typing import Tuple, List
 
 import cairo
 
-from config import Event, Events, Config
+from config import Event, Events, Config, Phase
 from util import Colour
 
 # A1 standard international paper size
@@ -263,51 +263,54 @@ def draw_grid(
         date += datetime.timedelta(weeks=drawn_weeks)
 
     for phase in config.phases.all:
-        start_date_offset = phase.from_date - birthdate.date()
-        end_date_offset = phase.to_date - birthdate.date()
-
-        pos_x = x_margin + 53 * (box_size + BOX_MARGIN) + 0.5 * box_size
-        pos_y = Y_MARGIN
-
-        ctx.set_source_rgb(*config.phase_colors[phase.layer])
-
-        start_y_coord = (start_date_offset.days / 365.25)
-        start_y_offset = math.floor(start_y_coord) * BOX_MARGIN + start_y_coord * box_size
-        end_y_coord = end_date_offset.days / 365.25
-        end_y_offset = math.floor(end_y_coord) * BOX_MARGIN + end_y_coord * box_size
-
-        ctx.set_line_width(1)
-        ctx.move_to(pos_x - box_size / 3, pos_y + start_y_offset)
-        ctx.line_to(pos_x + box_size / 3, pos_y + start_y_offset)
-        ctx.stroke()
-
-        ctx.set_line_width(1)
-        ctx.move_to(pos_x - box_size / 3, pos_y + end_y_offset)
-        ctx.line_to(pos_x + box_size / 3, pos_y + end_y_offset)
-        ctx.stroke()
-
-        ctx.set_line_width(3)
-        ctx.set_line_cap(cairo.LINE_CAP_SQUARE)
-
-        ctx.move_to(pos_x, pos_y + start_y_offset)
-
-        ctx.line_to(pos_x, pos_y + end_y_offset)
-        ctx.stroke()
-
-        text_h, text_w = text_size(ctx, phase.name)
-
-        ctx.save()
-        try:
-            ctx.translate(pos_x, pos_y + (start_y_offset + end_y_offset) / 2)
-            ctx.rotate(math.pi / 2)
-
-            ctx.move_to(-text_h/2, 0)
-
-            ctx.show_text(phase.name)
-        finally:
-            ctx.restore()
+        draw_phase(ctx, x_margin, box_size, birthdate, phase, config)
 
     return x_margin
+
+
+def draw_phase(
+        ctx: cairo.Context, x_margin: float, box_size: float, birthdate: datetime.datetime,
+        phase: Phase, config: Config):
+    start_date_offset = phase.from_date - birthdate.date()
+    end_date_offset = phase.to_date - birthdate.date()
+
+    pos_x = x_margin + 53 * (box_size + BOX_MARGIN) + 0.5 * box_size
+    pos_y = Y_MARGIN
+
+    ctx.set_source_rgb(*config.phase_colors[phase.layer])
+
+    start_y_coord = (start_date_offset.days / 365.25)
+    start_y_offset = math.floor(start_y_coord) * BOX_MARGIN + start_y_coord * box_size
+    end_y_coord = end_date_offset.days / 365.25
+    end_y_offset = math.floor(end_y_coord) * BOX_MARGIN + end_y_coord * box_size
+
+    ctx.set_line_width(1)
+    ctx.move_to(pos_x - box_size / 3, pos_y + start_y_offset)
+    ctx.line_to(pos_x + box_size / 3, pos_y + start_y_offset)
+    ctx.stroke()
+
+    ctx.set_line_width(1)
+    ctx.move_to(pos_x - box_size / 3, pos_y + end_y_offset)
+    ctx.line_to(pos_x + box_size / 3, pos_y + end_y_offset)
+    ctx.stroke()
+
+    ctx.set_line_width(3)
+    ctx.set_line_cap(cairo.LINE_CAP_SQUARE)
+    ctx.move_to(pos_x, pos_y + start_y_offset)
+    ctx.line_to(pos_x, pos_y + end_y_offset)
+    ctx.stroke()
+
+    text_h, text_w = text_size(ctx, phase.name)
+    ctx.save()
+    try:
+        ctx.translate(pos_x, pos_y + (start_y_offset + end_y_offset) / 2)
+        ctx.rotate(math.pi / 2)
+
+        ctx.move_to(-text_h / 2, -text_w / 4)
+
+        ctx.show_text(phase.name)
+    finally:
+        ctx.restore()
 
 
 def gen_calendar(
