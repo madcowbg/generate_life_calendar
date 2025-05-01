@@ -61,7 +61,8 @@ def parse_date(date: str) -> datetime.datetime:
     raise ValueError("Incorrect date format: must be dd-mm-yyyy or dd/mm/yyyy")
 
 
-def draw_square(ctx: cairo.Context, pos_x: int, pos_y: int, box_size: int, fillcolour: Colour = (1, 1, 1)) -> None:
+def draw_square(ctx: cairo.Context, pos_x: float, pos_y: float, box_size: float,
+                fillcolour: Colour = (1, 1, 1)) -> None:
     """
     Draws a square at pos_x,pos_y
     """
@@ -126,8 +127,8 @@ def get_darkened_fill(fill: Colour) -> Colour:
 
 
 def draw_row(
-        ctx: cairo.Context, pos_y: int, birthdate: datetime.datetime, date: datetime.datetime,
-        box_size: int, x_margin: int, darken_until_date: datetime.datetime, year_starts_at_bd: bool) -> int:
+        ctx: cairo.Context, pos_y: float, birthdate: datetime.datetime, date: datetime.datetime,
+        box_size: float, x_margin: float, darken_until_date: datetime.datetime, year_starts_at_bd: bool) -> int:
     """
     Draws a row of 52 or 53 squares, starting at pos_y.
     @return the number of squares drawn.
@@ -172,7 +173,7 @@ def draw_key_item(ctx: cairo.Context, pos_x: int, pos_y: int, desc: str, box_siz
 def draw_grid(
         ctx: cairo.Context,
         date: datetime.datetime, birthdate: datetime.datetime, age: int, darken_until_date: datetime.datetime,
-        year_starts_at_bd: bool):
+        year_starts_at_bd: bool, show_dates_in_row_header: bool):
     """
     Draws the whole grid of 52x90 squares
     """
@@ -213,13 +214,15 @@ def draw_grid(
     for i in range(num_rows):
         # Generate string for current date
         ctx.set_source_rgb(0, 0, 0)
-        date_str = date.strftime('%d %b, %Y')
-        w, h = text_size(ctx, date_str)
+        if show_dates_in_row_header:
+            row_header = date.strftime('%d %b, %Y')
+        else:
+            row_header = f"{i}"
+        w, h = text_size(ctx, row_header)
 
         # Draw it in front of the current row
-        ctx.move_to(x_margin - w - box_size,
-                    pos_y + ((box_size / 2) + (h / 2)))
-        ctx.show_text(date_str)
+        ctx.move_to(x_margin - w - box_size, pos_y + ((box_size / 2) + (h / 2)))
+        ctx.show_text(row_header)
 
         # Draw the current row
         drawn_weeks = draw_row(ctx, pos_y, birthdate, date, box_size, x_margin, darken_until_date, year_starts_at_bd)
@@ -233,7 +236,7 @@ def draw_grid(
 
 def gen_calendar(
         birthdate: datetime.datetime, title: str, age: int, filename: str, darken_until_date: datetime.datetime,
-        year_starts_at_bd: bool,
+        year_starts_at_bd: bool, show_dates_in_row_header: bool,
         sidebar_text: str | None = None, subtitle_text: str | None = None):
     if len(title) > MAX_TITLE_SIZE:
         raise ValueError("Title can't be longer than %d characters"
@@ -268,7 +271,7 @@ def gen_calendar(
     date = back_up_to_monday(birthdate)
 
     # Draw 52x90 grid of squares (with extra ones maybe)
-    x_margin = draw_grid(ctx, date, birthdate, age, darken_until_date, year_starts_at_bd)
+    x_margin = draw_grid(ctx, date, birthdate, age, darken_until_date, year_starts_at_bd, show_dates_in_row_header)
 
     if sidebar_text is not None:
         # Draw text on sidebar
@@ -325,12 +328,17 @@ def main():
         '-c', '--center', type=bool, dest='year_starts_at_bd',
         default=False, help='Year starts on birthday week. (Default is True)')
 
+    parser.add_argument(
+        '--show-dates', type=bool, dest='show_dates_in_row_header',
+        default=False, help='Show dates as row header. (Default is False)')
+
     args = parser.parse_args()
     doc_name = '%s.pdf' % (os.path.splitext(args.filename)[0])
 
     try:
         gen_calendar(
-            args.date, args.title, args.age, doc_name, args.darken_until_date, args.year_starts_at_bd,
+            args.date, args.title, args.age, doc_name, args.darken_until_date,
+            args.year_starts_at_bd, args.show_dates_in_row_header,
             sidebar_text=args.sidebar_text, subtitle_text=args.subtitle_text)
     except Exception as e:
         print("Error: %s" % e)
