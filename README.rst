@@ -1,6 +1,22 @@
 Personalised Life Calendar Generator
 ====================================
 
+Based on https://www.ekn.io/calendar, this fork aims to extend the life calendar
+generator with events and life phases, because who would not want want to
+immemorialize a certain number of dates in their life.
+
+The new features include:
+ * always starting with your birthday week (but some years will have 53 weeks).
+ * events supplied via a `config.toml`, listing events, phases, and colors to use.
+ * custom events are drawn on custom dates.
+ * custom phases are drawn on the right, spanning the necessary rows (and part of rows).
+
+
+.. image:: better_life_calendar.png
+
+
+Original Author's Note
+------------------------------------
 I'm a fan of the
 `Life Calendars <https://store.waitbutwhy.com/collections/life-calendars>`_ that
 can be found on Tim Urban's website www.waitbutwhy.com. It's basically a
