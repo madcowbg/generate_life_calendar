@@ -7,6 +7,8 @@ from typing import Dict, List, Iterable, Any
 
 from colour import Color
 
+from util import Colour
+
 
 @dataclasses.dataclass
 class EventType:
@@ -56,8 +58,8 @@ class PhaseType(Enum):
 @dataclasses.dataclass
 class Phase:
     name: str
-    from_date: datetime
-    to_date: datetime
+    from_date: datetime.date
+    to_date: datetime.date
     layer: PhaseType
 
 
@@ -87,13 +89,13 @@ class Config:
     def phases(self) -> Phases: return Phases(self.data.get('phases', {}))
 
     @cached_property
-    def event_colors(self) -> Dict[EventType, Color]:
+    def event_colors(self) -> Dict[EventType, Colour]:
         return dict(
             (EventType(event_type), Color(color_spec).rgb)
             for event_type, color_spec in self.data.get("event-colors", {}).items())
 
     @cached_property
-    def phase_colors(self) -> Dict[PhaseType, Color]:
+    def phase_colors(self) -> Dict[PhaseType, Colour]:
         return dict(
             (PhaseType(phase_type), Color(color_spec).rgb)
             for phase_type, color_spec in self.data.get("phase-colors", {}).items())
