@@ -308,7 +308,7 @@ def main():
 
     parser.add_argument(
         '-d', '--darken-until', type=parse_darken_until_date, dest='darken_until_date',
-        nargs='?', const='today', help='Darken until date. (defaults to today if argument is not given)')
+        nargs='?', default='today', help='Darken until date. (defaults to today if argument is not given)')
 
     args = parser.parse_args()
     doc_name = '%s.pdf' % (os.path.splitext(args.filename)[0])
