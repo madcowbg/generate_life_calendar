@@ -127,27 +127,34 @@ def get_darkened_fill(fill: Colour) -> Colour:
 
 def draw_row(
         ctx: cairo.Context, pos_y: int, birthdate: datetime.datetime, date: datetime.datetime,
-        box_size: int, x_margin: int, darken_until_date: datetime.datetime) -> None:
+        box_size: int, x_margin: int, darken_until_date: datetime.datetime, year_starts_at_bd: bool) -> int:
     """
-    Draws a row of 52 squares, starting at pos_y
+    Draws a row of 52 or 53 squares, starting at pos_y.
+    @return the number of squares drawn.
     """
 
     pos_x = x_margin
 
-    for i in range(NUM_COLUMNS):
+    current: datetime.datetime = date
+    while True:
         fill = (1, 1, 1)
 
-        if is_current_week(date, birthdate.month, birthdate.day):
+        if is_current_week(current, birthdate.month, birthdate.day):
             fill = BIRTHDAY_COLOUR
-        elif is_current_week(date, 1, 1):
+        elif is_current_week(current, 1, 1):
             fill = NEWYEAR_COLOUR
 
-        if darken_until_date and is_future(date, darken_until_date):
+        if darken_until_date and is_future(current, darken_until_date):
             fill = get_darkened_fill(fill)
 
         draw_square(ctx, pos_x, pos_y, box_size, fillcolour=fill)
         pos_x += box_size + BOX_MARGIN
-        date += datetime.timedelta(weeks=1)
+        current += datetime.timedelta(weeks=1)
+
+        if (not year_starts_at_bd and (current - date).days == 52 * 7) \
+                or (year_starts_at_bd and is_current_week(current, birthdate.month, birthdate.day)):
+            assert (current - date).days % 7 == 0
+            return (current - date).days // 7
 
 
 def draw_key_item(ctx: cairo.Context, pos_x: int, pos_y: int, desc: str, box_size: int, colour: Colour):
@@ -162,7 +169,10 @@ def draw_key_item(ctx: cairo.Context, pos_x: int, pos_y: int, desc: str, box_siz
     return pos_x + w + (box_size * 2)
 
 
-def draw_grid(ctx: cairo.Context, date, birthdate, age, darken_until_date):
+def draw_grid(
+        ctx: cairo.Context,
+        date: datetime.datetime, birthdate: datetime.datetime, age: int, darken_until_date: datetime.datetime,
+        year_starts_at_bd: bool):
     """
     Draws the whole grid of 52x90 squares
     """
@@ -212,17 +222,18 @@ def draw_grid(ctx: cairo.Context, date, birthdate, age, darken_until_date):
         ctx.show_text(date_str)
 
         # Draw the current row
-        draw_row(ctx, pos_y, birthdate, date, box_size, x_margin, darken_until_date)
+        drawn_weeks = draw_row(ctx, pos_y, birthdate, date, box_size, x_margin, darken_until_date, year_starts_at_bd)
 
         # Increment y position and current date by 1 row/year
         pos_y += box_size + BOX_MARGIN
-        date += datetime.timedelta(weeks=52)
+        date += datetime.timedelta(weeks=drawn_weeks)
 
     return x_margin
 
 
 def gen_calendar(
         birthdate: datetime.datetime, title: str, age: int, filename: str, darken_until_date: datetime.datetime,
+        year_starts_at_bd: bool,
         sidebar_text: str | None = None, subtitle_text: str | None = None):
     if len(title) > MAX_TITLE_SIZE:
         raise ValueError("Title can't be longer than %d characters"
@@ -256,8 +267,8 @@ def gen_calendar(
 
     date = back_up_to_monday(birthdate)
 
-    # Draw 52x90 grid of squares
-    x_margin = draw_grid(ctx, date, birthdate, age, darken_until_date)
+    # Draw 52x90 grid of squares (with extra ones maybe)
+    x_margin = draw_grid(ctx, date, birthdate, age, darken_until_date, year_starts_at_bd)
 
     if sidebar_text is not None:
         # Draw text on sidebar
@@ -310,12 +321,16 @@ def main():
         '-d', '--darken-until', type=parse_darken_until_date, dest='darken_until_date',
         nargs='?', default='today', help='Darken until date. (defaults to today if argument is not given)')
 
+    parser.add_argument(
+        '-c', '--center', type=bool, dest='year_starts_at_bd',
+        default=False, help='Year starts on birthday week. (Default is True)')
+
     args = parser.parse_args()
     doc_name = '%s.pdf' % (os.path.splitext(args.filename)[0])
 
     try:
         gen_calendar(
-            args.date, args.title, args.age, doc_name, args.darken_until_date,
+            args.date, args.title, args.age, doc_name, args.darken_until_date, args.year_starts_at_bd,
             sidebar_text=args.sidebar_text, subtitle_text=args.subtitle_text)
     except Exception as e:
         print("Error: %s" % e)
