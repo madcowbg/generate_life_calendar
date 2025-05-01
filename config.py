@@ -30,6 +30,12 @@ class Events:
         for name, prefs in self.events_data.items():
             yield Event(name, prefs["date"], EventType(prefs.get("type", 'None')))
 
+    def __getitem__(self, dates) -> List[Event]:
+        start, end = dates
+        assert type(start is datetime.datetime), type(start)
+        assert type(end is datetime.datetime), type(end)
+        return [e for e in self.all if start.date() <= e.date < end.date()]
+
 
 class PhaseType(Enum):
     GENERAL = 'None'
@@ -55,31 +61,35 @@ class Phases:
 
 
 class Config:
-    def __init__(self, filename: str):
+    def __init__(self, data):
+        self.data = data
+
+    @staticmethod
+    def load(filename: str) -> "Config":
         with open(filename, 'rb') as f:
-            self.data = tomllib.load(f)
+            return Config(tomllib.load(f))
 
     @property
-    def events(self) -> Events: return Events(self.data['events'])
+    def events(self) -> Events: return Events(self.data.get('events', {}))
 
     @property
-    def phases(self) -> Phases: return Phases(self.data['phases'])
+    def phases(self) -> Phases: return Phases(self.data.get('phases', {}))
 
     @cached_property
     def event_colors(self) -> Dict[EventType, Color]:
         return dict(
             (EventType(event_type), Color(color_spec).rgb)
-            for event_type, color_spec in self.data["event-colors"].items())
+            for event_type, color_spec in self.data.get("event-colors", {}).items())
 
     @cached_property
     def phase_colors(self) -> Dict[PhaseType, Color]:
         return dict(
             (PhaseType(phase_type), Color(color_spec).rgb)
-            for phase_type, color_spec in self.data["phase-colors"].items())
+            for phase_type, color_spec in self.data.get("phase-colors", {}).items())
 
 
 if __name__ == "__main__":
-    config = Config("my_config.toml")
+    config = Config.load("my_config.toml")
 
     for event in config.events.all:
         print(event)

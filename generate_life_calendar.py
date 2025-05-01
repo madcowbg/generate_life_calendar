@@ -4,9 +4,11 @@ import argparse
 import sys
 import os
 import math
-from typing import Tuple
+from typing import Tuple, List
 
 import cairo
+
+from config import Event, Events, Config
 
 # A1 standard international paper size
 DOC_WIDTH = 1683  # 594mm / 23 3/8 inches
@@ -61,14 +63,15 @@ def parse_date(date: str) -> datetime.datetime:
     raise ValueError("Incorrect date format: must be dd-mm-yyyy or dd/mm/yyyy")
 
 
-def draw_square(ctx: cairo.Context, pos_x: float, pos_y: float, box_size: float,
-                fillcolour: Colour = (1, 1, 1)) -> None:
+def draw_square(
+        ctx: cairo.Context, pos_x: float, pos_y: float, box_size: float, fillcolour: Colour = (1, 1, 1),
+        box_colour: Colour = (0.5, 0.5, 0.5)) -> None:
     """
     Draws a square at pos_x,pos_y
     """
 
     ctx.set_line_width(BOX_LINE_WIDTH)
-    ctx.set_source_rgb(0, 0, 0)
+    ctx.set_source_rgb(*box_colour)
     ctx.move_to(pos_x, pos_y)
 
     ctx.rectangle(pos_x, pos_y, box_size, box_size)
@@ -128,7 +131,8 @@ def get_darkened_fill(fill: Colour) -> Colour:
 
 def draw_row(
         ctx: cairo.Context, pos_y: float, birthdate: datetime.datetime, date: datetime.datetime,
-        box_size: float, x_margin: float, darken_until_date: datetime.datetime, year_starts_at_bd: bool) -> int:
+        box_size: float, x_margin: float, darken_until_date: datetime.datetime, year_starts_at_bd: bool,
+        events: Events) -> int:
     """
     Draws a row of 52 or 53 squares, starting at pos_y.
     @return the number of squares drawn.
@@ -136,6 +140,7 @@ def draw_row(
 
     pos_x = x_margin
 
+    events_to_draw: List[Tuple[float, float, float, List[Event]]] = list()
     current: datetime.datetime = date
     while True:
         fill = (1, 1, 1)
@@ -148,6 +153,10 @@ def draw_row(
         if darken_until_date and is_future(current, darken_until_date):
             fill = get_darkened_fill(fill)
 
+        events_at_week = events[current, current + datetime.timedelta(weeks=1)]
+        if len(events_at_week) > 0:
+            events_to_draw.append((pos_x, pos_y, box_size, events_at_week))
+
         draw_square(ctx, pos_x, pos_y, box_size, fillcolour=fill)
         pos_x += box_size + BOX_MARGIN
         current += datetime.timedelta(weeks=1)
@@ -155,7 +164,19 @@ def draw_row(
         if (not year_starts_at_bd and (current - date).days == 52 * 7) \
                 or (year_starts_at_bd and is_current_week(current, birthdate.month, birthdate.day)):
             assert (current - date).days % 7 == 0
-            return (current - date).days // 7
+            break
+
+    for pos_x, pos_y, box_size, events_at_week in events_to_draw:
+        for event in events_at_week:
+            w, h = text_size(ctx, event.name)
+            ctx.move_to(pos_x, pos_y + (box_size / 2) + (h / 2))
+
+            ctx.set_source_rgb(0, 0, 0)  # fixme add color
+            ctx.show_text(event.name)
+
+            pos_x += w
+
+    return (current - date).days // 7
 
 
 def draw_key_item(ctx: cairo.Context, pos_x: int, pos_y: int, desc: str, box_size: int, colour: Colour):
@@ -173,7 +194,7 @@ def draw_key_item(ctx: cairo.Context, pos_x: int, pos_y: int, desc: str, box_siz
 def draw_grid(
         ctx: cairo.Context,
         date: datetime.datetime, birthdate: datetime.datetime, age: int, darken_until_date: datetime.datetime,
-        year_starts_at_bd: bool, show_dates_in_row_header: bool):
+        year_starts_at_bd: bool, show_dates_in_row_header: bool, config: Config):
     """
     Draws the whole grid of 52x90 squares
     """
@@ -225,7 +246,8 @@ def draw_grid(
         ctx.show_text(row_header)
 
         # Draw the current row
-        drawn_weeks = draw_row(ctx, pos_y, birthdate, date, box_size, x_margin, darken_until_date, year_starts_at_bd)
+        drawn_weeks = draw_row(
+            ctx, pos_y, birthdate, date, box_size, x_margin, darken_until_date, year_starts_at_bd, config.events)
 
         # Increment y position and current date by 1 row/year
         pos_y += box_size + BOX_MARGIN
@@ -236,7 +258,7 @@ def draw_grid(
 
 def gen_calendar(
         birthdate: datetime.datetime, title: str, age: int, filename: str, darken_until_date: datetime.datetime,
-        year_starts_at_bd: bool, show_dates_in_row_header: bool,
+        year_starts_at_bd: bool, show_dates_in_row_header: bool, config: Config,
         sidebar_text: str | None = None, subtitle_text: str | None = None):
     if len(title) > MAX_TITLE_SIZE:
         raise ValueError("Title can't be longer than %d characters"
@@ -271,7 +293,8 @@ def gen_calendar(
     date = back_up_to_monday(birthdate)
 
     # Draw 52x90 grid of squares (with extra ones maybe)
-    x_margin = draw_grid(ctx, date, birthdate, age, darken_until_date, year_starts_at_bd, show_dates_in_row_header)
+    x_margin = draw_grid(
+        ctx, date, birthdate, age, darken_until_date, year_starts_at_bd, show_dates_in_row_header, config)
 
     if sidebar_text is not None:
         # Draw text on sidebar
@@ -332,13 +355,19 @@ def main():
         '--show-dates', type=bool, dest='show_dates_in_row_header',
         default=False, help='Show dates as row header. (Default is False)')
 
+    parser.add_argument(
+        '--config', type=str, dest='config_filename',
+        help='Config filename for events and phases.',
+        default=None)
+
     args = parser.parse_args()
     doc_name = '%s.pdf' % (os.path.splitext(args.filename)[0])
 
+    config = Config.load(args.config_filename) if args.config_filename else Config({})
     try:
         gen_calendar(
             args.date, args.title, args.age, doc_name, args.darken_until_date,
-            args.year_starts_at_bd, args.show_dates_in_row_header,
+            args.year_starts_at_bd, args.show_dates_in_row_header, config,
             sidebar_text=args.sidebar_text, subtitle_text=args.subtitle_text)
     except Exception as e:
         print("Error: %s" % e)
