@@ -5,3 +5,11 @@
 
 [phases]
 "phase" = { from_date = 2010-04-01, to_date = 2022-04-14, layer = "job" }
+
+[event-colors]
+"birthday" = "green"
+"death" = "red"
+None = "black"
+
+[phase-colors]
+"job" = "green"
