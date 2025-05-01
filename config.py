@@ -8,10 +8,21 @@ from typing import Dict, List, Iterable, Any
 from colour import Color
 
 
-class EventType(Enum):
-    GENERAL = 'None'
-    BIRTHDAY = "birthday"
-    DEATH = "death"
+@dataclasses.dataclass
+class EventType:
+    name: str | None
+
+    def __init__(self, name: str):
+        if name == 'None':
+            self.name = None
+        else:
+            self.name = name
+
+    def __hash__(self):
+        return hash(self.name) if self.name else 0
+
+    def __eq__(self, other):
+        return self.name == other.name
 
 
 @dataclasses.dataclass

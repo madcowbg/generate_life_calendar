@@ -26,6 +26,7 @@ FONT = "Brocha"
 BIGFONT_SIZE = 40
 SMALLFONT_SIZE = 16
 TINYFONT_SIZE = 14
+EVENTFONT_SIZE = 12
 
 MAX_TITLE_SIZE = 30
 DEFAULT_TITLE = "LIFE CALENDAR"
@@ -43,7 +44,7 @@ type Colour = Tuple[float, float, float]
 
 BIRTHDAY_COLOUR: Colour = (0.5, 0.5, 0.5)
 NEWYEAR_COLOUR: Colour = (0.8, 0.8, 0.8)
-DARKENED_COLOUR_DELTA: Colour = (-0.4, -0.4, -0.4)
+DARKENED_COLOUR_DELTA: Colour = (-0.1, -0.1, -0.1)
 
 ARROW_HEAD_LENGTH = 36
 ARROW_HEAD_WIDTH = 8
@@ -132,7 +133,7 @@ def get_darkened_fill(fill: Colour) -> Colour:
 def draw_row(
         ctx: cairo.Context, pos_y: float, birthdate: datetime.datetime, date: datetime.datetime,
         box_size: float, x_margin: float, darken_until_date: datetime.datetime, year_starts_at_bd: bool,
-        events: Events) -> int:
+        config: Config) -> int:
     """
     Draws a row of 52 or 53 squares, starting at pos_y.
     @return the number of squares drawn.
@@ -153,11 +154,16 @@ def draw_row(
         if darken_until_date and is_future(current, darken_until_date):
             fill = get_darkened_fill(fill)
 
-        events_at_week = events[current, current + datetime.timedelta(weeks=1)]
+        box_colour: Colour = (0.5, 0.5, 0.5)
+
+        events_at_week = config.events[current, current + datetime.timedelta(weeks=1)]
         if len(events_at_week) > 0:
             events_to_draw.append((pos_x, pos_y, box_size, events_at_week))
+            first_event = events_at_week[0]
+            box_colour = config.event_colors.get(first_event.type, box_colour)
+            fill = (1, 1, 1)
 
-        draw_square(ctx, pos_x, pos_y, box_size, fillcolour=fill)
+        draw_square(ctx, pos_x, pos_y, box_size, fillcolour=fill, box_colour=box_colour)
         pos_x += box_size + BOX_MARGIN
         current += datetime.timedelta(weeks=1)
 
@@ -168,10 +174,14 @@ def draw_row(
 
     for pos_x, pos_y, box_size, events_at_week in events_to_draw:
         for event in events_at_week:
+            ctx.select_font_face(FONT, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            ctx.set_font_size(EVENTFONT_SIZE)
+
             w, h = text_size(ctx, event.name)
             ctx.move_to(pos_x, pos_y + (box_size / 2) + (h / 2))
 
-            ctx.set_source_rgb(0, 0, 0)  # fixme add color
+            color = config.event_colors.get(event.type, (0, 0, 0))
+            ctx.set_source_rgb(*color)
             ctx.show_text(event.name)
 
             pos_x += w
@@ -247,7 +257,7 @@ def draw_grid(
 
         # Draw the current row
         drawn_weeks = draw_row(
-            ctx, pos_y, birthdate, date, box_size, x_margin, darken_until_date, year_starts_at_bd, config.events)
+            ctx, pos_y, birthdate, date, box_size, x_margin, darken_until_date, year_starts_at_bd, config)
 
         # Increment y position and current date by 1 row/year
         pos_y += box_size + BOX_MARGIN
