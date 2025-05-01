@@ -61,7 +61,7 @@ def parse_date(date: str) -> datetime.datetime:
     raise ValueError("Incorrect date format: must be dd-mm-yyyy or dd/mm/yyyy")
 
 
-def draw_square(ctx: cairo.Context, pos_x: int, pos_y: int, box_size: int, fillcolour=(1, 1, 1)) -> None:
+def draw_square(ctx: cairo.Context, pos_x: int, pos_y: int, box_size: int, fillcolour: Colour = (1, 1, 1)) -> None:
     """
     Draws a square at pos_x,pos_y
     """
