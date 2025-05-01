@@ -1,14 +1,12 @@
-import datetime
-import calendar
 import argparse
-import sys
-import os
+import datetime
 import math
-from typing import Tuple, List
+import os
+from typing import Tuple, List, Dict
 
 import cairo
 
-from config import Event, Events, Config, Phase
+from config import Event, Config, Phase, PhaseType
 from util import Colour
 
 # A1 standard international paper size
@@ -33,13 +31,14 @@ MAX_TITLE_SIZE = 30
 DEFAULT_TITLE = "LIFE CALENDAR"
 
 Y_MARGIN = 144
+Y_BOTTOM_MARGIN = 144
 BOX_MARGIN = 6
 
 MIN_AGE = 80
 MAX_AGE = 100
 
 BOX_LINE_WIDTH = 3
-NUM_COLUMNS = 52
+NUM_COLUMNS = 53
 
 BIRTHDAY_COLOUR: Colour = (0.5, 0.5, 0.5)
 NEWYEAR_COLOUR: Colour = (0.8, 0.8, 0.8)
@@ -159,8 +158,7 @@ def draw_row(
         if len(events_at_week) > 0:
             events_to_draw.append((pos_x, pos_y, box_size, events_at_week))
             first_event = events_at_week[0]
-            box_colour = config.event_colors.get(first_event.type, box_colour)
-            fill = (1, 1, 1)
+            box_colour = tuple(s * 1.5 for s in config.event_colors.get(first_event.type, box_colour))
 
         draw_square(ctx, pos_x, pos_y, box_size, fillcolour=fill, box_colour=box_colour)
         pos_x += box_size + BOX_MARGIN
@@ -208,17 +206,15 @@ def draw_grid(
     Draws the whole grid of 52x90 squares
     """
     num_rows = age
-    box_size = ((DOC_HEIGHT - (Y_MARGIN + 36)) / num_rows) - BOX_MARGIN
+    box_size = ((DOC_HEIGHT - (Y_MARGIN + Y_BOTTOM_MARGIN)) / num_rows) - BOX_MARGIN
     x_margin = (DOC_WIDTH - ((box_size + BOX_MARGIN) * NUM_COLUMNS)) / 2
 
-    start_date = date
     pos_x = x_margin / 4
     pos_y = pos_x
 
     # Draw the key for box colours
     ctx.set_font_size(TINYFONT_SIZE)
-    ctx.select_font_face(FONT, cairo.FONT_SLANT_NORMAL,
-                         cairo.FONT_WEIGHT_NORMAL)
+    ctx.select_font_face(FONT, cairo.FONT_SLANT_NORMAL,                         cairo.FONT_WEIGHT_NORMAL)
 
     pos_x = draw_key_item(ctx, pos_x, pos_y, KEY_BIRTHDAY_DESC, box_size, BIRTHDAY_COLOUR)
     draw_key_item(ctx, pos_x, pos_y, KEY_NEWYEAR_DESC, box_size, NEWYEAR_COLOUR)
@@ -262,22 +258,25 @@ def draw_grid(
         pos_y += box_size + BOX_MARGIN
         date += datetime.timedelta(weeks=drawn_weeks)
 
+    layer_x_offsets = dict((layer, idx) for idx, layer in
+                           enumerate(sorted({phase.layer for phase in config.phases.all}, key=lambda p: p.name)))
     for phase in config.phases.all:
-        draw_phase(ctx, x_margin, box_size, birthdate, phase, config)
+        draw_phase(ctx, x_margin, box_size, birthdate, phase, config, layer_x_offsets, darken_until_date)
 
     return x_margin
 
 
 def draw_phase(
         ctx: cairo.Context, x_margin: float, box_size: float, birthdate: datetime.datetime,
-        phase: Phase, config: Config):
+        phase: Phase, config: Config, layer_x_offsets: Dict[PhaseType, float], darken_until_date: datetime.datetime):
     start_date_offset = phase.from_date - birthdate.date()
-    end_date_offset = phase.to_date - birthdate.date()
+    is_ended = phase.to_date is not None
+    end_date_offset = (phase.to_date if is_ended else darken_until_date.date()) - birthdate.date()
 
-    pos_x = x_margin + 53 * (box_size + BOX_MARGIN) + 0.5 * box_size
+    pos_x = x_margin + 53 * (box_size + BOX_MARGIN) + 0.5 * box_size + layer_x_offsets[phase.layer] * box_size
     pos_y = Y_MARGIN
 
-    ctx.set_source_rgb(*config.phase_colors[phase.layer])
+    ctx.set_source_rgb(*config.phase_colors.get(phase.layer, (0, 0, 0)))
 
     start_y_coord = (start_date_offset.days / 365.25)
     start_y_offset = math.floor(start_y_coord) * BOX_MARGIN + start_y_coord * box_size
@@ -289,10 +288,11 @@ def draw_phase(
     ctx.line_to(pos_x + box_size / 3, pos_y + start_y_offset)
     ctx.stroke()
 
-    ctx.set_line_width(1)
-    ctx.move_to(pos_x - box_size / 3, pos_y + end_y_offset)
-    ctx.line_to(pos_x + box_size / 3, pos_y + end_y_offset)
-    ctx.stroke()
+    if is_ended:
+        ctx.set_line_width(1)
+        ctx.move_to(pos_x - box_size / 3, pos_y + end_y_offset)
+        ctx.line_to(pos_x + box_size / 3, pos_y + end_y_offset)
+        ctx.stroke()
 
     ctx.set_line_width(3)
     ctx.set_line_cap(cairo.LINE_CAP_SQUARE)

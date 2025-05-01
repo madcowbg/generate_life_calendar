@@ -50,16 +50,28 @@ class Events:
         return [e for e in self.all if start.date() <= e.date < end.date()]
 
 
-class PhaseType(Enum):
-    GENERAL = 'None'
-    JOB = "job"
+@dataclasses.dataclass
+class PhaseType:
+    name: str | None
+
+    def __init__(self, name: str):
+        if name == 'None':
+            self.name = None
+        else:
+            self.name = name
+
+    def __hash__(self):
+        return hash(self.name) if self.name else 0
+
+    def __eq__(self, other):
+        return self.name == other.name
 
 
 @dataclasses.dataclass
 class Phase:
     name: str
     from_date: datetime.date
-    to_date: datetime.date
+    to_date: datetime.date | None
     layer: PhaseType
 
 
@@ -70,7 +82,7 @@ class Phases:
     @property
     def all(self) -> Iterable[Phase]:
         for name, prefs in self.phases_data.items():
-            yield Phase(name, prefs["from_date"], prefs["to_date"], PhaseType(prefs.get("layer", 'None')))
+            yield Phase(name, prefs["from_date"], prefs.get("to_date"), PhaseType(prefs.get("layer", 'None')))
 
 
 class Config:
