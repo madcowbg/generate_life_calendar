@@ -21,11 +21,11 @@ KEY_BIRTHDAY_DESC = "Week of your birthday"
 XAXIS_DESC = "Weeks of the year"
 YAXIS_DESC = "Years of your life"
 
-FONT = "Brocha"
+FONT = "Arial"
 BIGFONT_SIZE = 40
 SMALLFONT_SIZE = 16
 TINYFONT_SIZE = 14
-EVENTFONT_SIZE = 12
+EVENTFONT_SIZE = 10
 
 MAX_TITLE_SIZE = 30
 DEFAULT_TITLE = "LIFE CALENDAR"
@@ -158,7 +158,10 @@ def draw_row(
         if len(events_at_week) > 0:
             events_to_draw.append((pos_x, pos_y, box_size, events_at_week))
             first_event = events_at_week[0]
-            box_colour = tuple(s * 1.5 for s in config.event_colors.get(first_event.type, box_colour))
+
+            event_color = config.event_colors.get(first_event.type, box_colour)
+            box_colour = tuple(s * 1.5 for s in event_color)
+            fill = tuple(s + 0.6 for s in event_color)
 
         draw_square(ctx, pos_x, pos_y, box_size, fillcolour=fill, box_colour=box_colour)
         pos_x += box_size + BOX_MARGIN
@@ -209,8 +212,8 @@ def draw_grid(
     box_size = ((DOC_HEIGHT - (Y_MARGIN + Y_BOTTOM_MARGIN)) / num_rows) - BOX_MARGIN
     x_margin = (DOC_WIDTH - ((box_size + BOX_MARGIN) * NUM_COLUMNS)) / 2
 
-    pos_x = x_margin / 4
-    pos_y = pos_x
+    pos_x = x_margin
+    pos_y = x_margin / 4
 
     # Draw the key for box colours
     ctx.set_font_size(TINYFONT_SIZE)
